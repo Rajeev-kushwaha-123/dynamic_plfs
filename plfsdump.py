@@ -15,7 +15,7 @@ load_dotenv()
 
 # Construct database URL from environment variables
 db_url = create_engine(
-    f"{os.getenv('ENGINE')}://{os.getenv('DATABASE_USER')}:{os.getenv('PASSWORD')}@{os.getenv('HOST')}:{os.getenv('PORT')}/{os.getenv('DATABASE')}"
+    f"{os.getenv('ENGINE')}://{os.getenv('DTABASE_USER')}:{os.getenv('PASSWORD')}@{os.getenv('HOST')}/{os.getenv('PLFS_DATABASE')}"
 )
 
 # db_url = 'postgresql://postgres:root@127.0.0.1:5432/plfs_db'
@@ -46,16 +46,17 @@ select
 	pf.religion_code,
 	pf.social_group_code,
 	pf.job_contract_code,
-	pf.sub_industry_code,
+	pf.nic2_industry_code,
 	pf.hour_working_code,
 	pf.sub_self_employment_code,
 	pf.nic_code,
 	nc.description as nic_description,
 	sse.sub_self_employment_name as sub_self_employment_description,
-	si.sub_industry_name as sub_industry_description,
+	ni.nic2_industry_name as nic2_industry_description,
 	hw.hour_working_name as  hour_working_description,
 	jb.job_contract_name as job_contract_description,
 	sg.social_group_name as social_group_description,
+	i.indicator_display_name as indicator_display_description,
 	rc.religion_name as religion_description,
     a.agegroup_name AS age_group_description,
     slf.self_employment_name AS self_employment_description,
@@ -118,7 +119,7 @@ left join
 left join
   job_contract as jb on pf.job_contract_code=jb.job_contract_code
 left join
-   sub_industry as si on  pf.sub_industry_code= si.sub_industry_code
+   industry_nic_2 as ni on  pf.nic2_industry_code= ni.nic2_industry_code
 left join
     hour_working as hw on pf.hour_working_code=hw.hour_working_code
 left join 
@@ -128,22 +129,28 @@ left join
 
     where i.status = 'Active'
 '''
-df = pd.read_sql_query(query, db_url)
+# df = pd.read_sql_query(query, db_url)
+# pf1=df.to_csv("Database_plfs.csv")
+# print(pf1)
+df=pd.read_csv("Database_plfs.csv",low_memory=False)
 
 #sorting indicator on the basis of indicator code 
-indicator_df = df[["indicator_code","indicator_description","indicator_status"]]
-indicator_df.indicator_code= pd.to_numeric(indicator_df.indicator_code, errors='coerce')
+indicator_df = df[["indicator_code","indicator_description","indicator_status","indicator_display_description"]]
+# indicator_df.indicator_code= pd.to_numeric(indicator_df.indicator_code, errors='coerce')
+indicator_df.loc[:, 'indicator_code'] = pd.to_numeric(indicator_df['indicator_code'], errors='coerce')
 indicator_df = indicator_df[indicator_df['indicator_status'] == 'Active']
 indicator_df = indicator_df.sort_values(by="indicator_code")
 
 #sorting state on the basis of state code 
 filtered_df1=df[["state_code","state_description"]]
-filtered_df1.state_code=pd.to_numeric(filtered_df1.state_code,errors='coerce')
+# filtered_df1.state_code=pd.to_numeric(filtered_df1.state_code,errors='coerce')
+filtered_df1.loc[:, 'state_code'] = pd.to_numeric(filtered_df1['state_code'], errors='coerce')
 filtered_df1=filtered_df1.sort_values(by="state_code")
-
 
 # sorting year 
 df=df.sort_values(by='year')
+
+#print('LABEL VALUE',str({'label': i, 'value': i} for i in df['age_group_description'].unique()))
 
 external_stylesheets = [
     {
@@ -177,7 +184,7 @@ def get_default_dropdown_values():
     default_umpce ="all"
     default_religion='Hinduism'
     default_job_contract="Not eligible for paid leave"
-    default_sub_industry='05-09 (mining & quarrying)'
+    default_industry_nic_2='05-09 (mining & quarrying)'
     default_hour_working="All"
     default_sub_self_employment="Own account worker, employer"
 
@@ -186,16 +193,16 @@ def get_default_dropdown_values():
             default_age_group, default_education_level, default_industry, default_occupation_divisions,
             default_enterprise_type, default_work_industry, default_broad_employment, default_self_employment,
             default_quarter,default_disaggregation_level,default_umpce,default_religion, 
-            default_job_contract,default_sub_industry,default_hour_working,default_sub_self_employment)
+            default_job_contract, default_industry_nic_2,default_hour_working,default_sub_self_employment)
 
 # Get default dropdown values
 (default_indicator, default_state, default_sector, default_gender, default_year, default_status,
  default_age_group, default_education_level, default_industry, default_occupation_divisions,
  default_enterprise_type, default_work_industry, default_broad_employment, default_self_employment,
  default_quarter,default_disaggregation_level,default_umpce,default_religion,
- default_job_contract,default_sub_industry,default_hour_working,default_sub_self_employment) = get_default_dropdown_values()
+ default_job_contract, default_industry_nic_2,default_hour_working,default_sub_self_employment) = get_default_dropdown_values()
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets,routes_pathname_prefix='/viz/plfs/', requests_pathname_prefix='/viz/plfs/')
 app.title = "PLFS"
 
 app.layout = html.Div(
@@ -214,13 +221,14 @@ app.layout = html.Div(
                         html.Div(children="Indicator", className="menu-title"),
                         dcc.Dropdown(
                             id="indicator-dropdown",
-                            options=[{'label': i, 'value': i} for i in indicator_df['indicator_description'].unique()],
+                            options=[{'label': i, 'value': j} for i,j in zip(indicator_df["indicator_display_description"].unique(),indicator_df["indicator_description"].unique())],
+                            
                             placeholder="Indicator",
                             searchable=False,
                             clearable=False,
                             className="dropdown",
                             value= default_indicator,
-                            style={ "fontSize": "10px"}
+                            style={ "fontSize": "12px"}
                         ),
                     ],
                     style={'marginBottom': '0px'}                    
@@ -534,18 +542,18 @@ app.layout = html.Div(
                     style={'marginBottom': '0px'}
                 ),
                 html.Div(
-                    id="sub-industry-container",
+                    id="industry-nic2-container",
                     children=[
-                        html.Div(children="sub-industry", className="menu-title"),
+                        html.Div(children="nic2-industry", className="menu-title"),
                         dcc.Dropdown(
-                            id="sub-industry-dropdown",
-                            options=[{'label': str(status), 'value': status} for status in df['sub_industry_description'].unique()],
+                            id="nic2-industry-dropdown",
+                            options=[{'label': str(status), 'value': status} for status in df['nic2_industry_description'].unique()],
                             multi=False,
                             clearable=False,
                             searchable=False,
                             className="dropdown",
-                            placeholder="sub_industry",
-                            value=default_sub_industry
+                            placeholder="nic2_industry",
+                            value=default_industry_nic_2
                         ),
                     ],
                     style={'marginBottom': '0px'}
@@ -622,7 +630,7 @@ app.layout = html.Div(
                            'marginTop': '30px',
                          'marginBottom': '0px'
                       }
-                ),href='/'),
+                ),href='/viz/plfs/'),
                 html.Button(
                     'Download', id='download-svg-button', n_clicks=0, className='mr-1',
                     style={
@@ -700,7 +708,7 @@ app.layout = html.Div(
     Output("umpce-container","style"),
     Output("religion-container","style"),
     Output("job-contract-container","style"),
-    Output("sub-industry-container","style"),
+    Output("industry-nic2-container","style"),
     Output("hour-working-container","style"),
     Output("sub-self-employment-container","style"),
     [Input("indicator-dropdown", "value")]
@@ -727,7 +735,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},     #umpce-dropdown
             {'display':'none'},      #religion-dropdown
             {'display':'none'},      #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
@@ -746,13 +754,13 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},   # enterprise-type-dropdown
             {'display': 'none'},   # work-industry-dropdown
             {'display': 'none'},   # broad-employment-dropdown
-            {'display': 'block'},    # self-employment-dropdown
-            {'display': 'none'},    #quarter-dropdown
+            {'display': 'none'},    # self-employment-dropdown
+            {'display': 'block'},    #quarter-dropdown
             {'display': 'none'},    #disaggregation-level-dropdown 
             {'display': 'none'} ,    #umpce-dropdown 
             {'display':'none'},       #religion-dropdown
             {'display':'none'},      #job-contract-dropdown
-            {'display':'none'},      #sub-industry-dropdown
+            {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
          )
@@ -776,7 +784,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'} ,    #umpce-dropdown
             {'display':'none'},      #religion-dropdown
             {'display':'block'},       #job-contract-dropdown
-            {'display':'none'},      #sub-industry-dropdown
+            {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
@@ -799,8 +807,8 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},    #disaggregation-level-dropdown  
             {'display': 'none'} ,    #umpce-dropdown
             {'display':'none'},     #religion-dropdown
-             {'display':'none'} ,      #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'} ,      #job-contract-dropdown
+            {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
@@ -823,9 +831,9 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},    #disaggregation-level-dropdown  
             {'display': 'none'},     #umpce-dropdown
             {'display':'none'},       #religion-dropdown
-             {'display':'none'},       #job-contract-dropdown
-              {'display':'none'},     #sub-industry-dropdown
-           {'display':'none'},       #hour-working-dropdown
+            {'display':'none'},       #job-contract-dropdown
+            {'display':'none'},     #nic2-industry-dropdown
+            {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
     elif indicator=="Average gross earnings (Rs. 0.00) during last 30 days from self-employment among self-employed persons":
@@ -848,7 +856,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},    #umpce-dropdown
             {'display':'none'},       #religion-dropdown
             {'display':'none'},       #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
@@ -872,7 +880,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'}  ,   #umpce-dropdown
             {'display':'none'}  ,     #religion-dropdown
             {'display':'none'} ,      #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
@@ -896,7 +904,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},     #umpce-dropdown
             {'display':'none'}  ,     #religion-dropdown
              {'display':'none'} ,     #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
@@ -920,7 +928,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},     #umpce-dropdown
             {'display':'none'},     #religion-dropdown
             {'display':'none'},       #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'block'}       # sub-self-employment-dropdown
         )
@@ -945,7 +953,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},     #umpce-dropdown
             {'display':'none'} ,      #religion-dropdown
             {'display':'none'} ,      #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},    #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
@@ -969,7 +977,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},     #umpce-dropdown
             {'display':'none'} ,      #religion-dropdown
             {'display':'none'} ,      #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
@@ -994,10 +1002,85 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},     #umpce-dropdown
             {'display':'none'} ,      #religion-dropdown
             {'display':'none'} ,      #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
+    elif indicator=="Percentage  distribution of usually working persons":
+             return (
+            {'display': 'block'},  # state-dropdown
+            {'display': 'block'},  # sector-dropdown
+            {'display': 'block'},  # year-dropdown
+            {'display': 'block'},  # status-dropdown
+            {'display': 'none'},   # age-group-dropdown
+            {'display': 'block'},   # gender-dropdown
+            {'display': 'none'},   # education-level-dropdown
+            {'display': 'none'},   # industry-dropdown
+            {'display': 'none'},   # occupation-divisions-dropdown
+            {'display': 'none'},   # enterprise-type-dropdown
+            {'display': 'block'},   # work-industry-dropdown
+            {'display': 'none'},   # broad-employment-dropdown
+            {'display': 'none'},    # self-employment-dropdown
+            {'display': 'none'},   #quarter-dropdown
+            {'display': 'none'},    #disaggregation-level-dropdown  
+            {'display': 'none'},     #umpce-dropdown
+            {'display':'none'} ,      #religion-dropdown
+            {'display':'none'} ,      #job-contract-dropdown
+            {'display':'none'},      #nic2-industry-dropdown
+            {'display':'none'},       #hour-working-dropdown
+            {'display':'none'}       # sub-self-employment-dropdown
+        )
+    elif indicator=="Percentage distribution of  person working":
+             return (
+            {'display': 'block'},  # state-dropdown
+            {'display': 'block'},  # sector-dropdown
+            {'display': 'block'},  # year-dropdown
+            {'display': 'block'},  # status-dropdown
+            {'display': 'none'},   # age-group-dropdown
+            {'display': 'block'},   # gender-dropdown
+            {'display': 'none'},   # education-level-dropdown
+            {'display': 'none'},   # industry-dropdown
+            {'display': 'none'},   # occupation-divisions-dropdown
+            {'display': 'none'},   # enterprise-type-dropdown
+            {'display': 'none'},   # work-industry-dropdown
+            {'display': 'none'},   # broad-employment-dropdown
+            {'display': 'block'},    # self-employment-dropdown
+            {'display': 'none'},   #quarter-dropdown
+            {'display': 'none'},    #disaggregation-level-dropdown  
+            {'display': 'none'},     #umpce-dropdown
+            {'display':'none'} ,      #religion-dropdown
+            {'display':'none'} ,      #job-contract-dropdown
+            {'display':'none'},     #nic2-industry-dropdown
+            {'display':'none'},       #hour-working-dropdown
+            {'display':'block'}       # sub-self-employment-dropdown
+        )
+    elif indicator=="Average number of hours (0.0) actually worked per week considering all the economic activities performed during the week for person with broad status in employment in CWS":
+            return (
+            {'display': 'block'},  # state-dropdown
+            {'display': 'block'},  # sector-dropdown
+            {'display': 'block'},  # year-dropdown
+            {'display': 'block'},  # status-dropdown
+            {'display': 'none'},   # age-group-dropdown
+            {'display': 'block'},   # gender-dropdown
+            {'display': 'none'},   # education-level-dropdown
+            {'display': 'none'},   # industry-dropdown
+            {'display': 'none'},   # occupation-divisions-dropdown
+            {'display': 'none'},   # enterprise-type-dropdown
+            {'display': 'none'},   # work-industry-dropdown
+            {'display': 'block'},   # broad-employment-dropdown
+            {'display': 'none'},    # self-employment-dropdown
+            {'display': 'block'},   #quarter-dropdown
+            {'display': 'none'},    #disaggregation-level-dropdown  
+            {'display': 'none'},     #umpce-dropdown
+            {'display':'none'} ,      #religion-dropdown
+            {'display':'none'} ,      #job-contract-dropdown
+            {'display':'none'},    #nic2-industry-dropdown
+            {'display':'none'},       #hour-working-dropdown
+            {'display':'none'}       # sub-self-employment-dropdown
+        )
+    
+
+    
     else:
         return (
             {'display': 'none'},   # state-dropdown
@@ -1018,10 +1101,11 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},    #umpce-dropdown
             {'display':'none'},      #religion-dropdown
             {'display':'none'},       #job-contract-dropdown
-            {'display':'none'},     #sub-industry-dropdown
+            {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'}       # sub-self-employment-dropdown
         )
+    
 @app.callback(
     Output("plot-output", "figure"),
     [Input('plot-button', 'n_clicks'),
@@ -1045,7 +1129,7 @@ def update_dropdown_visibility(indicator):
      State('umpce-dropdown','value'),
      State("religion-dropdown","value"),
      State("job-contract-dropdown","value"),
-     State("sub-industry-dropdown","value"),
+     State("nic2-industry-dropdown","value"),
      State("hour-working-dropdown","value"),
      State("sub-self-employment-dropdown","value")]
 )
@@ -1053,7 +1137,7 @@ def update_dropdown_visibility(indicator):
 def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, status, 
                 age_group, education_level, industry, occupation_divisions, 
                 enterprise_type, work_industry, broad_employment, self_employment,
-                quarter,disaggregation_level,umpce,religion,job_contract,sub_industry,hour_working,sub_self_employment):
+                quarter,disaggregation_level,umpce,religion,job_contract,nic2_industry,hour_working,sub_self_employment):
     
     print('Plotting Graph Now')
     ctx = dash.callback_context
@@ -1083,7 +1167,7 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
           '==>umpce:', umpce,
           '==>religion:',religion,
           "==>job-contract:",job_contract,
-          "==>sub-industry:",sub_industry,
+          "==>nic2-industry:",nic2_industry,
           "==>hour-working:",hour_working,
           '==>sub-self-employment',sub_self_employment)
     
@@ -1118,11 +1202,15 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
                   
     elif indicator=="Percentage distribution of persons in labour force":
 
-        if self_employment is not None or self_employment=="Self-Employed":
-            filtered_df = filtered_df[filtered_df['self_employment_description'] == self_employment]
+        # if self_employment is not None or self_employment=="Self-Employed":
+        #     filtered_df = filtered_df[filtered_df['self_employment_description'] == self_employment]
 
-        elif self_employment == None:
-           filtered_df = filtered_df[(filtered_df['self_employment_description'].isnull())]
+        # elif self_employment == None:
+        #    filtered_df = filtered_df[(filtered_df['self_employment_description'].isnull())]
+        if quarter is not None or quarter =="Jan-Mar":
+            filtered_df = filtered_df[filtered_df['quarter_description'] == quarter]
+        elif quarter == None:
+            filtered_df = filtered_df[(filtered_df['quarter_description'].isnull())]
         
 
         
@@ -1224,7 +1312,7 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
 
         #Add logic to remove rows in filtered_df dataframe that contains NULL Value for religion_description
         filtered_df = filtered_df[(filtered_df['quarter_description'].isnull())]
-        filtered_df = filtered_df[(filtered_df['sub_industry_description'].isnull())]
+        filtered_df = filtered_df[(filtered_df['nic2_industry_description'].isnull())]
         filtered_df = filtered_df[(filtered_df['hour_working_description'].isnull())]
         filtered_df = filtered_df[(filtered_df['broad_employment_description'].isnull())]
         filtered_df=filtered_df[(filtered_df['nic_description'].isnull())]
@@ -1289,9 +1377,38 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
             filtered_df = filtered_df[filtered_df['quarter_description'] == quarter]
         elif quarter == None:
             filtered_df = filtered_df[(filtered_df['quarter_description'].isnull())]
-    
-        
 
+    elif indicator=="Percentage  distribution of usually working persons":
+          
+        if work_industry is not None or work_industry =="All":
+            filtered_df = filtered_df[filtered_df['work_industry_description'] == work_industry]
+        elif work_industry  == None:
+            filtered_df = filtered_df[(filtered_df['work_industry_description'].isnull())]
+
+    elif indicator=="Percentage distribution of  person working":
+        if self_employment is not None or self_employment=="Self-Employed":
+            filtered_df = filtered_df[filtered_df['self_employment_description'] == self_employment]
+
+        elif self_employment == None:
+           filtered_df = filtered_df[(filtered_df['self_employment_description'].isnull())]
+
+        if sub_self_employment is not None or sub_self_employment=="Own account worker, employer":
+
+            filtered_df = filtered_df[filtered_df['sub_self_employment_description'] == sub_self_employment]
+
+        elif sub_self_employment == None:
+           filtered_df = filtered_df[(filtered_df['sub_self_employment_description'].isnull())]
+
+    elif indicator=="Average number of hours (0.0) actually worked per week considering all the economic activities performed during the week for person with broad status in employment in CWS":
+        if broad_employment is not None or broad_employment=="All":
+            filtered_df = filtered_df[filtered_df['broad_employment_description'] == broad_employment]
+        elif broad_employment == None:
+            filtered_df = filtered_df[(filtered_df['broad_employment_description'].isnull())]
+        
+        if quarter is not None or quarter =="Jan-Mar":
+            filtered_df = filtered_df[filtered_df['quarter_description'] == quarter]
+        elif quarter == None:
+            filtered_df = filtered_df[(filtered_df['quarter_description'].isnull())]
 
     # if industry is not None or industry =="Agriculture, forestry and fishing":
     #     filtered_df = filtered_df[filtered_df['industry_description'] == industry]
@@ -1309,11 +1426,6 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
     #     filtered_df = filtered_df[filtered_df['enterprise_type_description'] == enterprise_type]
     # elif enterprise_type == None:
     #     filtered_df = filtered_df[(filtered_df['enterprise_type_description'].isnull())]
-     
-    # if work_industry is not None or work_industry =="All":
-    #     filtered_df = filtered_df[filtered_df['work_industry_description'] == work_industry]
-    # elif work_industry  == None:
-    #     filtered_df = filtered_df[(filtered_df['work_industry_description'].isnull())]
     
     # if umpce is not None or umpce == "all":
     #     filtered_df = filtered_df[filtered_df['umpce_description'] == umpce]
@@ -1330,8 +1442,11 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
     #     filtered_df = filtered_df[filtered_df['religion_description'] == religion]
     # elif religion == None:
     #     filtered_df = filtered_df[(filtered_df['religion_description'].isnull())]  
-
     # Handle "Select All" in year dropdown
+
+    yaxis_title = indicator_df.loc[indicator_df["indicator_description"] == indicator, "indicator_display_description"].values[0]
+
+
     if "Select All" in year:
         years = df["year"].unique()
        
@@ -1353,13 +1468,22 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
         fig.add_trace(go.Scatter(
             x=filtered_df["year"],
             y=filtered_df["indicator_value"],
-            mode="lines+markers",  
-            marker=dict(size=15)
+            mode='lines+markers',
+            marker=dict(size=12), 
+            marker_color='#124365' 
+            
         ))
         fig.update_layout(
             xaxis={"title": "Year"},
-            yaxis={"title": indicator},
-            hovermode="closest"
+            yaxis={"title":yaxis_title},
+            xaxis_title_font=dict(size=17, family='Arial, sans-serif', color='black', weight='bold'),
+            yaxis_title_font=dict(size=17, family='Arial, sans-serif', color='black', weight='bold'),
+            hovermode="closest",
+            template='plotly_white',
+            font_color='black',
+            margin=dict(t=0),
+            #  width=1370,
+            #  height=661,
         )
         fig.update_xaxes(categoryorder='category ascending')
         fig.update_yaxes(categoryorder='category ascending')
