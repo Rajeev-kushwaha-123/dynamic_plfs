@@ -14,12 +14,8 @@ import numpy as np
 load_dotenv()
 
 # Construct database URL from environment variables
-db_url = create_engine(
-    f"{os.getenv('ENGINE')}://{os.getenv('DTABASE_USER')}:{os.getenv('PASSWORD')}@{os.getenv('HOST')}/{os.getenv('PLFS_DATABASE')}"
-)
-
-# db_url = 'postgresql://postgres:root@127.0.0.1:5432/plfs_db'
-
+db_url = create_engine(f"{os.getenv('ENGINE')}://{os.getenv('DTABASE_USER')}:{os.getenv('PASSWORD')}@{os.getenv('HOST')}/{os.getenv('PLFS_DATABASE')}")
+# db_url = 'postgresql://postgres:postgres@127.0.0.1:5432/plfs_db'
 
 query= '''	
 select
@@ -129,23 +125,23 @@ left join
 
     where i.status = 'Active'
 '''
-# df = pd.read_sql_query(query, db_url)
-# pf1=df.to_csv("Database_plfs.csv")
-# print(pf1)
-df=pd.read_csv("Database_plfs.csv",low_memory=False)
+df = pd.read_sql_query(query, db_url)
+#df.to_csv('plfs_db_result.csv')
+# df = pd.read_csv("plfs_db_result.csv")
+
 
 #sorting indicator on the basis of indicator code 
 indicator_df = df[["indicator_code","indicator_description","indicator_status","indicator_display_description"]]
-# indicator_df.indicator_code= pd.to_numeric(indicator_df.indicator_code, errors='coerce')
-indicator_df.loc[:, 'indicator_code'] = pd.to_numeric(indicator_df['indicator_code'], errors='coerce')
+indicator_df.indicator_code= pd.to_numeric(indicator_df.indicator_code, errors='coerce')
 indicator_df = indicator_df[indicator_df['indicator_status'] == 'Active']
 indicator_df = indicator_df.sort_values(by="indicator_code")
 
 #sorting state on the basis of state code 
 filtered_df1=df[["state_code","state_description"]]
-# filtered_df1.state_code=pd.to_numeric(filtered_df1.state_code,errors='coerce')
-filtered_df1.loc[:, 'state_code'] = pd.to_numeric(filtered_df1['state_code'], errors='coerce')
+filtered_df1.state_code=pd.to_numeric(filtered_df1.state_code,errors='coerce')
 filtered_df1=filtered_df1.sort_values(by="state_code")
+
+
 
 # sorting year 
 df=df.sort_values(by='year')
@@ -168,15 +164,15 @@ def get_default_dropdown_values():
     default_indicator = "Labour Force Participation Rate"
     default_state = 'All India'
     default_sector = 'Rural + Urban'
+    default_status = 'Current Weekly Status (CWS)'
     default_gender = 'Person'
     default_year = ["Select All"]
-    default_status = "Usual Status (PS + SS)"
     default_age_group = "All Ages"
     default_education_level = " "
     default_industry = "Agriculture, forestry and fishing"
     default_occupation_divisions = "All"
     default_enterprise_type ="Total "
-    default_work_industry = "All"
+    default_work_industry = "Seconday"
     default_broad_employment = "All"
     default_self_employment = "Self-Employed"
     default_quarter ="Jan-Mar"
@@ -187,7 +183,8 @@ def get_default_dropdown_values():
     default_industry_nic_2='05-09 (mining & quarrying)'
     default_hour_working="All"
     default_sub_self_employment="Own account worker, employer"
-
+    
+   
     
     return (default_indicator, default_state, default_sector, default_gender, default_year, default_status,
             default_age_group, default_education_level, default_industry, default_occupation_divisions,
@@ -202,7 +199,32 @@ def get_default_dropdown_values():
  default_quarter,default_disaggregation_level,default_umpce,default_religion,
  default_job_contract, default_industry_nic_2,default_hour_working,default_sub_self_employment) = get_default_dropdown_values()
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets,routes_pathname_prefix='/viz/plfs/', requests_pathname_prefix='/viz/plfs/')
+
+
+def get_status_dropdown(selected_indicator):
+    # Define the indicators that should return 'Usual Status (PS + SS)'
+    indicators_for_usual_status = [
+        
+    ]
+    
+    # Check if the selected_indicator is in the list
+    if selected_indicator in indicators_for_usual_status:
+        return 'Usual Status (PS + SS)'
+    else:
+        return 'Current Weekly Status (CWS)'
+
+selected_indicator = 'Labour Force Participation Rate'
+default_status_value = get_status_dropdown(selected_indicator)
+print('THE DEFAULT VALUE OF PDW SHOULD BE USUAL STATUS:',default_status_value)
+# Test cases to verify the function works as expected
+print(get_status_dropdown('Percentage distribution of workers'))  # Should print: 'Usual Status (PS + SS)'
+print(get_status_dropdown('Percentage of regular wage/ salaried employees in non-agriculture sector'))  # Should print: 'Usual Status (PS + SS)'
+print(get_status_dropdown('Labour Force Participation Rate'))  # Should print: 'Current Weekly Status (CWS)'
+print(get_status_dropdown('Other Indicator'))  # Should print: 'Current Weekly Status (CWS)'
+
+
+    
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "PLFS"
 
 app.layout = html.Div(
@@ -288,7 +310,7 @@ app.layout = html.Div(
                      id="disaggregation-level-container",
                      style={'marginBottom': '0px'},
                     children=[
-                        html.Div(children="Disaggregation-Level", className="menu-title"),
+                        html.Div(children="Disaggregation Level", className="menu-title"),
                         dcc.Dropdown(
                             id="disaggregation-level-dropdown",
                             options=[{'label': i, 'value': i} for i in df['disaggregation_level_description'].unique()],
@@ -305,7 +327,7 @@ app.layout = html.Div(
                      id="umpce-container",
                      style={'marginBottom': '0px'},
                     children=[
-                        html.Div(children="umpce", className="menu-title"),
+                        html.Div(children="Umpce", className="menu-title"),
                         dcc.Dropdown(
                             id="umpce-dropdown",
                             options=[{'label': i, 'value': i} for i in df['umpce_description'].unique()],
@@ -356,7 +378,7 @@ app.layout = html.Div(
                     id="industry-container",
                     style={'display':"none",'marginBottom': '0px'},
                     children=[
-                        html.Div(children="industry", className="menu-title"),
+                        html.Div(children="Industry", className="menu-title"),
                         dcc.Dropdown(
                             id="industry-dropdown",
                             options=[{'label': i, 'value': i} for i in df['industry_description'].unique()],
@@ -373,7 +395,7 @@ app.layout = html.Div(
                     id="work-industry-container",
                     style={'display':"none",'marginBottom': '0px'},
                     children=[
-                        html.Div(children="Work industry", className="menu-title"),
+                        html.Div(children="Work Industry", className="menu-title"),
                         dcc.Dropdown(
                             id="work-industry-dropdown",
                             options=[{'label': i, 'value': i} for i in df['work_industry_description'].unique()],
@@ -390,7 +412,7 @@ app.layout = html.Div(
                     id="enterprise-type-container",
                     style={'display':"none",'marginBottom': '0px'},
                     children=[
-                        html.Div(children="Enterprise type", className="menu-title"),
+                        html.Div(children="Enterprise Type", className="menu-title"),
                         dcc.Dropdown(
                             id="enterprise-type-dropdown",
                             options=[{'label': i, 'value': i} for i in df['enterprise_type_description'].unique()],
@@ -407,7 +429,7 @@ app.layout = html.Div(
                     id="self-employment-container",
                     style={'display':"none",'marginBottom': '0px'},
                     children=[
-                        html.Div(children="Self employment", className="menu-title"),
+                        html.Div(children="Self Employment", className="menu-title"),
                         dcc.Dropdown(
                             id="self-employment-dropdown",
                             options=[{'label': i, 'value': i} for i in df['self_employment_description'].unique()],
@@ -424,7 +446,7 @@ app.layout = html.Div(
                     id="occupation-divisions-container",
                     style={'display':"none",'marginBottom': '0px'},
                     children=[
-                        html.Div(children="Occupation-divisions", className="menu-title"),
+                        html.Div(children="Occupation Divisions", className="menu-title"),
                         dcc.Dropdown(
                             id="occupation-divisions-dropdown",
                             options=[{'label': i, 'value': i} for i in df['occupation_divisions_description'].unique()],
@@ -442,7 +464,7 @@ app.layout = html.Div(
                     id="broad-employment-container",
                     style={'display':"none",'marginBottom': '0px'},
                     children=[
-                        html.Div(children="Broad employment", className="menu-title"),
+                        html.Div(children="Broad Employment", className="menu-title"),
                         dcc.Dropdown(
                             id="broad-employment-dropdown",
                             options=[{'label': i, 'value': i} for i in df['broad_employment_description'].unique()],
@@ -458,7 +480,7 @@ app.layout = html.Div(
                 html.Div(
                     id="education-level-container",
                     children=[
-                        html.Div(children="Education level", className="menu-title"),
+                        html.Div(children="Education Level", className="menu-title"),
                         dcc.Dropdown(
                             id="education-level-dropdown",
                             options=[{'label': i, 'value': i} for i in df['education_level_description'].unique()],
@@ -495,7 +517,7 @@ app.layout = html.Div(
                         html.Div(children="Status", className="menu-title"),
                         dcc.Dropdown(
                             id="status-dropdown",
-                            options=[{'label': str(status), 'value': status} for status in df['status_description'].unique()],
+                            options=[{'label': i, 'value': i} for i in df['status_description'].unique()],
                             multi=False,
                             clearable=False,
                             searchable=False,
@@ -509,7 +531,7 @@ app.layout = html.Div(
                 html.Div(
                     id="religion-container",
                     children=[
-                        html.Div(children="religion", className="menu-title"),
+                        html.Div(children="Religion", className="menu-title"),
                         dcc.Dropdown(
                             id="religion-dropdown",
                             options=[{'label': str(status), 'value': status} for status in df['religion_description'].unique()],
@@ -526,7 +548,7 @@ app.layout = html.Div(
                     html.Div(
                     id="job-contract-container",
                     children=[
-                        html.Div(children="job-contract", className="menu-title"),
+                        html.Div(children="Job Contract", className="menu-title"),
                         dcc.Dropdown(
                             id="job-contract-dropdown",
                             options=[{'label': str(status), 'value': status} for status in df['job_contract_description'].unique()],
@@ -544,7 +566,7 @@ app.layout = html.Div(
                 html.Div(
                     id="industry-nic2-container",
                     children=[
-                        html.Div(children="nic2-industry", className="menu-title"),
+                        html.Div(children="Nic2 Industry", className="menu-title"),
                         dcc.Dropdown(
                             id="nic2-industry-dropdown",
                             options=[{'label': str(status), 'value': status} for status in df['nic2_industry_description'].unique()],
@@ -561,7 +583,7 @@ app.layout = html.Div(
                 html.Div(
                     id="hour-working-container",
                     children=[
-                        html.Div(children="hour-working", className="menu-title"),
+                        html.Div(children="Hour Working", className="menu-title"),
                         dcc.Dropdown(
                             id="hour-working-dropdown",
                             options=[{'label': str(status), 'value': status} for status in df['hour_working_description'].unique()],
@@ -578,7 +600,7 @@ app.layout = html.Div(
                    html.Div(
                     id="sub-self-employment-container",
                     children=[
-                        html.Div(children="sub-self-employment", className="menu-title"),
+                        html.Div(children="Sub Self Eemployment", className="menu-title"),
                         dcc.Dropdown(
                             id="sub-self-employment-dropdown",
                             options=[{'label': str(status), 'value': status} for status in df['sub_self_employment_description'].unique()],
@@ -711,6 +733,7 @@ app.layout = html.Div(
     Output("industry-nic2-container","style"),
     Output("hour-working-container","style"),
     Output("sub-self-employment-container","style"),
+    Output("status-container","children"),
     [Input("indicator-dropdown", "value")]
 )
 def update_dropdown_visibility(indicator):
@@ -737,7 +760,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'},      #job-contract-dropdown
             {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Percentage distribution of persons in labour force":
          
@@ -762,7 +786,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'},      #job-contract-dropdown
             {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
          )
     elif indicator == "Percentage of regular wage/ salaried employees in non-agriculture sector ":
         return (
@@ -786,7 +811,8 @@ def update_dropdown_visibility(indicator):
             {'display':'block'},       #job-contract-dropdown
             {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Usual Status (PS + SS)"),]
         )
     elif indicator=="Average wage/salary earnings (Rs. 0.00) during the preceding calendar month from regular wage/salaried  employment among the regular wage/salaried employees":
         return (
@@ -810,7 +836,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'} ,      #job-contract-dropdown
             {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Average wage/salary earnings (Rs. 0.00) per day from casual labour work other than public works in CWS":
         return (
@@ -834,7 +861,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'},       #job-contract-dropdown
             {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Average gross earnings (Rs. 0.00) during last 30 days from self-employment among self-employed persons":
         return (
@@ -858,7 +886,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'},       #job-contract-dropdown
             {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Average no. of hours available for additional work in a week (0.0) for person with broad status in employment in CWS":
         return (
@@ -882,7 +911,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'} ,      #job-contract-dropdown
             {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Percentage of workers available for additional work during the week for person with broad status in employment in CWS":
         return (
@@ -906,7 +936,8 @@ def update_dropdown_visibility(indicator):
              {'display':'none'} ,     #job-contract-dropdown
             {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Percentage distribution of workers":
         return (
@@ -930,7 +961,10 @@ def update_dropdown_visibility(indicator):
             {'display':'none'},       #job-contract-dropdown
             {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'block'}       # sub-self-employment-dropdown
+            {'display':'block'},       # sub-self-employment-dropdown
+            #Logic below to set Status to Usual Status for TWO SPECIFIC INDICATORS which only have Data in CWS
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Usual Status (PS + SS)"),]
+    
         )
     
     elif indicator=="Average wage earnings (Rs.) per day from casual labour work":
@@ -955,7 +989,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'} ,      #job-contract-dropdown
             {'display':'none'},    #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Average no. of days worked in a week (0.0) for person with broad status in employment in CWS":
          return (
@@ -979,7 +1014,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'} ,      #job-contract-dropdown
             {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     
     elif indicator=='Average no. of days actually worked in a week (0.0) for person with broad status in employment in CWS':
@@ -1004,7 +1040,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'} ,      #job-contract-dropdown
             {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Percentage  distribution of usually working persons":
              return (
@@ -1028,7 +1065,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'} ,      #job-contract-dropdown
             {'display':'none'},      #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Percentage distribution of  person working":
              return (
@@ -1052,7 +1090,8 @@ def update_dropdown_visibility(indicator):
             {'display':'none'} ,      #job-contract-dropdown
             {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'block'}       # sub-self-employment-dropdown
+            {'display':'block'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Average number of hours (0.0) actually worked per week considering all the economic activities performed during the week for person with broad status in employment in CWS":
             return (
@@ -1076,8 +1115,10 @@ def update_dropdown_visibility(indicator):
             {'display':'none'} ,      #job-contract-dropdown
             {'display':'none'},    #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
+    
     
 
     
@@ -1103,9 +1144,10 @@ def update_dropdown_visibility(indicator):
             {'display':'none'},       #job-contract-dropdown
             {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
-            {'display':'none'}       # sub-self-employment-dropdown
+            {'display':'none'},       # sub-self-employment-dropdown
+            [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
-    
+
 @app.callback(
     Output("plot-output", "figure"),
     [Input('plot-button', 'n_clicks'),
@@ -1176,7 +1218,7 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
 
     # Initial common filtering
     filtered_df = df[
-        (df['indicator_description'] == indicator) & 
+        (df['indicator_description'] == indicator) &
         (df['state_description'] == state) & 
         (df['gender_description'] == gender) & 
         (df['sector_description'] == sector) &
@@ -1199,6 +1241,9 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
         #Add logic to remove rows in filtered_df dataframe that contains NULL Value for religion_description
         filtered_df = filtered_df[(filtered_df['religion_description'].isnull())]
         filtered_df = filtered_df[(filtered_df['social_group_description'].isnull())]
+        filtered_df = filtered_df[(filtered_df['disaggregation_level_description'].isnull())]
+        filtered_df = filtered_df[(filtered_df['umpce_description'].isnull())]
+        print("catch up the repeated problem in first three indicator:",filtered_df)
                   
     elif indicator=="Percentage distribution of persons in labour force":
 
@@ -1380,7 +1425,7 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
 
     elif indicator=="Percentage  distribution of usually working persons":
           
-        if work_industry is not None or work_industry =="All":
+        if work_industry is not None or work_industry =="Seconday":
             filtered_df = filtered_df[filtered_df['work_industry_description'] == work_industry]
         elif work_industry  == None:
             filtered_df = filtered_df[(filtered_df['work_industry_description'].isnull())]
@@ -1409,6 +1454,9 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
             filtered_df = filtered_df[filtered_df['quarter_description'] == quarter]
         elif quarter == None:
             filtered_df = filtered_df[(filtered_df['quarter_description'].isnull())]
+
+        
+
 
     # if industry is not None or industry =="Agriculture, forestry and fishing":
     #     filtered_df = filtered_df[filtered_df['industry_description'] == industry]
@@ -1442,11 +1490,8 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
     #     filtered_df = filtered_df[filtered_df['religion_description'] == religion]
     # elif religion == None:
     #     filtered_df = filtered_df[(filtered_df['religion_description'].isnull())]  
+    yaxis_title = indicator_df.loc[indicator_df["indicator_description"]==indicator , "indicator_display_description"].values[0]
     # Handle "Select All" in year dropdown
-
-    yaxis_title = indicator_df.loc[indicator_df["indicator_description"] == indicator, "indicator_display_description"].values[0]
-
-
     if "Select All" in year:
         years = df["year"].unique()
        
@@ -1475,7 +1520,7 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
         ))
         fig.update_layout(
             xaxis={"title": "Year"},
-            yaxis={"title":yaxis_title},
+            yaxis={"title": yaxis_title},
             xaxis_title_font=dict(size=17, family='Arial, sans-serif', color='black', weight='bold'),
             yaxis_title_font=dict(size=17, family='Arial, sans-serif', color='black', weight='bold'),
             hovermode="closest",
