@@ -17,6 +17,8 @@ load_dotenv()
 db_url = create_engine(f"{os.getenv('ENGINE')}://{os.getenv('DTABASE_USER')}:{os.getenv('PASSWORD')}@{os.getenv('HOST')}/{os.getenv('PLFS_DATABASE')}")
 # db_url = 'postgresql://postgres:postgres@127.0.0.1:5432/plfs_db'
 
+
+#create query from Database
 query= '''	
 select
     pf.plfs_fact_code,
@@ -125,12 +127,17 @@ left join
 
     where i.status = 'Active'
 '''
+
+# read data from query
 df = pd.read_sql_query(query, db_url)
+
 #df.to_csv('plfs_db_result.csv')
+
 # df = pd.read_csv("plfs_db_result.csv")
 
 
 #sorting indicator on the basis of indicator code 
+#adding indicator status and indicator display description in the query
 indicator_df = df[["indicator_code","indicator_description","indicator_status","indicator_display_description"]]
 indicator_df.indicator_code= pd.to_numeric(indicator_df.indicator_code, errors='coerce')
 indicator_df = indicator_df[indicator_df['indicator_status'] == 'Active']
@@ -146,8 +153,7 @@ filtered_df1=filtered_df1.sort_values(by="state_code")
 # sorting year 
 df=df.sort_values(by='year')
 
-#print('LABEL VALUE',str({'label': i, 'value': i} for i in df['age_group_description'].unique()))
-
+#create  external stylesheet for fonts 
 external_stylesheets = [
     {
         "href": "https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap",
@@ -169,7 +175,7 @@ def get_default_dropdown_values():
     default_year = ["Select All"]
     default_age_group = "All Ages"
     default_education_level = " "
-    default_industry = "Agriculture, forestry and fishing"
+    default_industry = " "
     default_occupation_divisions = "All"
     default_enterprise_type ="Total "
     default_work_industry = "Seconday"
@@ -183,7 +189,7 @@ def get_default_dropdown_values():
     default_industry_nic_2='05-09 (mining & quarrying)'
     default_hour_working="All"
     default_sub_self_employment="Own account worker, employer"
-    
+  
    
     
     return (default_indicator, default_state, default_sector, default_gender, default_year, default_status,
@@ -200,7 +206,7 @@ def get_default_dropdown_values():
  default_job_contract, default_industry_nic_2,default_hour_working,default_sub_self_employment) = get_default_dropdown_values()
 
 
-
+# define the indicator for specific default value
 def get_status_dropdown(selected_indicator):
     # Define the indicators that should return 'Usual Status (PS + SS)'
     indicators_for_usual_status = [
@@ -223,10 +229,11 @@ print(get_status_dropdown('Labour Force Participation Rate'))  # Should print: '
 print(get_status_dropdown('Other Indicator'))  # Should print: 'Current Weekly Status (CWS)'
 
 
-    
+# creating a Dash 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "PLFS"
 
+#create div container for different dropdowns 
 app.layout = html.Div(
     className="content-wrapper",
     children=[
@@ -386,10 +393,11 @@ app.layout = html.Div(
                             searchable=False,
                             className="dropdown",
                             placeholder="industry",
+                             style={"fontSize": "12px"},
                             value=default_industry
                         ),
                     ],
-                    
+                   
                 ),
                 html.Div(
                     id="work-industry-container",
@@ -614,6 +622,7 @@ app.layout = html.Div(
                     ],
                     style={'marginBottom': '0px'}
                 ),
+                # create apply button 
                 html.Button(
                     'Apply', id='plot-button', n_clicks=0, className='mr-1',
                     style={
@@ -634,6 +643,7 @@ app.layout = html.Div(
                     }
                 ),
                # Inside app.layout within the HTML structure where buttons are placed
+               # reset as loading page 
                 html.A(html.Button(
                        'Reset', id='reset-button', n_clicks=0, className='mr-1',
                         style={
@@ -653,6 +663,7 @@ app.layout = html.Div(
                          'marginBottom': '0px'
                       }
                 ),href='/viz/plfs/'),
+                #create download button 
                 html.Button(
                     'Download', id='download-svg-button', n_clicks=0, className='mr-1',
                     style={
@@ -677,6 +688,7 @@ app.layout = html.Div(
         html.Div(
             style={'flex': '1', 'padding': '20px', 'position': 'relative', 'text-align': 'center', 'height': 'calc(100% - 50px)'},
             children=[
+                # for loading after clicking the button
                 dcc.Loading(
                     id="loading-graph",
                     type="circle", color='#83b944',
@@ -690,6 +702,7 @@ app.layout = html.Div(
                                     id="loading-circle",
                                     style={"position": "absolute", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)"}
                                 ),
+                                # Graph area 
                                 dcc.Graph(
                                     id="plot-output",
                                     config={"displayModeBar": False},
@@ -711,6 +724,7 @@ app.layout = html.Div(
         )
     ]
 )
+# callback for doing styling of the Dynamic Graph
 @app.callback(
     Output("state-container", "style"),
     Output("sector-container", "style"),
@@ -736,6 +750,8 @@ app.layout = html.Div(
     Output("status-container","children"),
     [Input("indicator-dropdown", "value")]
 )
+# Defining callback function
+
 def update_dropdown_visibility(indicator):
     print("UPDATE DROPDOWN VISIBILITY ACCORDING TO INDICATOR SELECTED BY USER!")
     if indicator in ['Labour Force Participation Rate', 'Worker Population Ratio', 'Unemployment Rate']: 
@@ -761,6 +777,7 @@ def update_dropdown_visibility(indicator):
             {'display':'none'},     #nic2-industry-dropdown
             {'display':'none'},       #hour-working-dropdown
             {'display':'none'},       # sub-self-employment-dropdown
+            #For defining specific default value for dropdown 
             [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
     elif indicator=="Percentage distribution of persons in labour force":
@@ -1052,7 +1069,7 @@ def update_dropdown_visibility(indicator):
             {'display': 'none'},   # age-group-dropdown
             {'display': 'block'},   # gender-dropdown
             {'display': 'none'},   # education-level-dropdown
-            {'display': 'none'},   # industry-dropdown
+            {'display': 'block'},   # industry-dropdown
             {'display': 'none'},   # occupation-divisions-dropdown
             {'display': 'none'},   # enterprise-type-dropdown
             {'display': 'block'},   # work-industry-dropdown
@@ -1147,7 +1164,7 @@ def update_dropdown_visibility(indicator):
             {'display':'none'},       # sub-self-employment-dropdown
             [html.Div(children="Status", className="menu-title"),dcc.Dropdown(id="status-dropdown",options=[{"label": i, "value": i} for i in df["status_description"].unique()],multi=False,clearable=False,searchable=False,className="dropdown",placeholder="Status",value="Current Weekly Status (CWS)"),]
         )
-
+#callback for the value and button to plot the graph
 @app.callback(
     Output("plot-output", "figure"),
     [Input('plot-button', 'n_clicks'),
@@ -1175,20 +1192,22 @@ def update_dropdown_visibility(indicator):
      State("hour-working-dropdown","value"),
      State("sub-self-employment-dropdown","value")]
 )
-
+# callback Function 
 def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, status, 
                 age_group, education_level, industry, occupation_divisions, 
                 enterprise_type, work_industry, broad_employment, self_employment,
                 quarter,disaggregation_level,umpce,religion,job_contract,nic2_industry,hour_working,sub_self_employment):
     
     print('Plotting Graph Now')
+    # It is used for triggered the value atleast once without clicking the button and plot the graph
     ctx = dash.callback_context
     button_id = None
     if not ctx.triggered:
         button_id = None
     else:
         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-        
+
+    #checking the value are inserted properly or not  
     print('==>button_id:', n_clicks, 
           '==>indicator:', indicator, 
           '==>state:', state, 
@@ -1224,9 +1243,12 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
         (df['sector_description'] == sector) &
         (df['status_description'] == status)
     ]
-
+    
     print('+++++++++++++++filtered_df:',filtered_df)
+
     # # Apply additional filters if values are provided
+
+    # checking the condtion ,according to requirement of the indicators
     if indicator in ['Labour Force Participation Rate', 'Worker Population Ratio', 'Unemployment Rate']: 
         if age_group is not None or age_group ==  "All Ages":
             filtered_df = filtered_df[filtered_df['age_group_description'] == age_group]
@@ -1429,6 +1451,14 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
             filtered_df = filtered_df[filtered_df['work_industry_description'] == work_industry]
         elif work_industry  == None:
             filtered_df = filtered_df[(filtered_df['work_industry_description'].isnull())]
+        
+        if industry is not None or industry ==" ":
+            filtered_df = filtered_df[filtered_df['industry_description'] == industry]
+        
+        elif industry == None:
+            filtered_df = filtered_df[(filtered_df['industry_description'].isnull())]
+
+
 
     elif indicator=="Percentage distribution of  person working":
         if self_employment is not None or self_employment=="Self-Employed":
@@ -1457,13 +1487,6 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
 
         
 
-
-    # if industry is not None or industry =="Agriculture, forestry and fishing":
-    #     filtered_df = filtered_df[filtered_df['industry_description'] == industry]
-       
-    # elif industry == None:
-    #     filtered_df = filtered_df[(filtered_df['industry_description'].isnull())]
-
     # if occupation_divisions is not None or occupation_divisions =="All":
     #     filtered_df = filtered_df[filtered_df['occupation_divisions_description'] == occupation_divisions]
 
@@ -1490,14 +1513,19 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
     #     filtered_df = filtered_df[filtered_df['religion_description'] == religion]
     # elif religion == None:
     #     filtered_df = filtered_df[(filtered_df['religion_description'].isnull())]  
+
+
+    #setting dynamic value in yaxis and located the value according to indicator display description
     yaxis_title = indicator_df.loc[indicator_df["indicator_description"]==indicator , "indicator_display_description"].values[0]
+
     # Handle "Select All" in year dropdown
     if "Select All" in year:
         years = df["year"].unique()
        
     else:
         years = year
-        
+    
+
     filtered_df = filtered_df[filtered_df["year"].isin(years)]
     
     # Debug: Print filtered DataFrame
@@ -1510,6 +1538,7 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
     # Create the plot
     fig = go.Figure()
     if n_clicks > 0 or n_intervals == 1:
+        # ploting the graph
         fig.add_trace(go.Scatter(
             x=filtered_df["year"],
             y=filtered_df["indicator_value"],
@@ -1518,6 +1547,7 @@ def update_plot(n_clicks, n_intervals, indicator, state, sector, gender, year, s
             marker_color='#124365' 
             
         ))
+        # giving the x and y axis title 
         fig.update_layout(
             xaxis={"title": "Year"},
             yaxis={"title": yaxis_title},
